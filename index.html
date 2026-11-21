@@ -56,7 +56,7 @@
 
   /* ---- Header / hero ---- */
   header.hero{
-    display:flex; flex-direction:column; gap:18px;
+    display:flex; flex-direction:column; gap:10px;
     padding: 28px 24px 26px;
     border-radius: 28px;
     background: linear-gradient(145deg, #1a1626, #15131f 60%);
@@ -131,14 +131,14 @@
   .adv-row label{ display:flex; align-items:center; gap:6px; }
 
   /* ---- Layout: feed + rail ---- */
-  .layout{ display:grid; grid-template-columns: 1fr 320px; gap:22px; margin-top: 24px; align-items:start; }
+  .layout{ display:grid; grid-template-columns: 1fr 320px; gap:16px; margin-top: 14px; align-items:start; }
   @media (max-width: 860px){ .layout{ grid-template-columns: 1fr; } }
 
   .feed-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
   .feed-head h2{ font-family:var(--font-display); font-size:18px; margin:0; font-weight:700; }
   .feed-count{ color: var(--muted); font-size: 13px; }
 
-  .cards{ display:flex; flex-direction:column; gap:16px; }
+  .cards{ display:flex; flex-direction:column; gap:10px; }
 
   .empty, .loading, .error-box{
     border: 1px dashed var(--border); border-radius: var(--radius);
@@ -234,7 +234,7 @@
   .load-more{ display:flex; justify-content:center; margin-top: 10px; }
 
   /* ---- Rail (koleksi) ---- */
-  .rail{ position: sticky; top: 18px; display:flex; flex-direction:column; gap:14px; }
+  .rail{ position: sticky; top: 18px; display:flex; flex-direction:column; gap:10px; }
   .rail-card{
     background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
     padding: 18px;
@@ -304,28 +304,6 @@
       <label>Tahun dari <input type="number" id="yearFrom" placeholder="2015" style="width:70px" /></label>
       <label>sampai <input type="number" id="yearTo" placeholder="2026" style="width:70px" /></label>
       <span class="mode-pill" style="border-color:rgba(198,255,62,0.4); color:var(--accent3);">⬇️ Hanya yang ada link unduh (PDF/Word)</span>
-    </div>
-
-    <div class="adv-row" style="border-top:1px dashed var(--border); padding-top:12px; margin-top:4px;">
-      <label>📝 Resume materi:
-        <select id="resumeLen">
-          <option value="1">Super singkat (1 kalimat)</option>
-          <option value="2" selected>Sedang (2-3 kalimat)</option>
-          <option value="4">Lengkap (4-5 kalimat)</option>
-        </select>
-      </label>
-      <label>Format:
-        <select id="resumeFormat">
-          <option value="paragraf" selected>Paragraf</option>
-          <option value="poin">Poin-poin</option>
-        </select>
-      </label>
-      <label style="flex:1; min-width:220px;">Perintah/fokus resume (opsional):
-        <input type="text" id="resumeFocus" placeholder="misal: metode, hasil, kesimpulan" style="width:100%; margin-top:4px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:7px 10px; font-size:13px;" />
-      </label>
-    </div>
-
-    <div class="adv-row" style="border-top:1px dashed var(--border); padding-top:12px;">
       <label>🏷️ Filter SINTA:
         <select id="sintaFilter">
           <option value="">Semua (nggak difilter)</option>
@@ -336,8 +314,8 @@
           <option value="5">SINTA 5</option>
         </select>
       </label>
-      <span style="color:var(--muted); font-size:12px; max-width:560px;">⚠️ Data SINTA di sini cuma daftar terkurasi manual dari sumber publik (mayoritas rumpun Komunikasi), <b style="color:var(--text)">bukan database lengkap 10 ribuan jurnal SINTA</b>. Selalu cek ulang di <a href="https://sinta.kemdikbud.go.id" target="_blank" rel="noopener">sinta.kemdikbud.go.id</a>. Scopus belum punya API gratis, jadi tiap hasil dikasih tombol "Cek Scopus" buat verifikasi manual.</span>
     </div>
+    <div style="color:var(--muted); font-size:12px; margin-top:4px;">⚠️ Data SINTA di sini cuma daftar terkurasi manual dari sumber publik (mayoritas rumpun Komunikasi), <b style="color:var(--text)">bukan database lengkap 10 ribuan jurnal SINTA</b>. Selalu cek ulang di <a href="https://sinta.kemdikbud.go.id" target="_blank" rel="noopener">sinta.kemdikbud.go.id</a>. Scopus belum punya API gratis, jadi tiap hasil dikasih tombol "Cek Scopus" buat verifikasi manual.</div>
   </header>
 
   <div class="layout">
@@ -355,13 +333,6 @@
     </main>
 
     <aside class="rail">
-      <div class="rail-card">
-        <h3>📝 Resume Materi Sendiri</h3>
-        <p style="font-size:12.5px; color:var(--muted); margin:0 0 10px;">Tempel teks/materi apa pun (nggak harus dari hasil pencarian), biar Cuy AI bikinin resume-nya pakai pengaturan panjang/format/fokus di atas.</p>
-        <textarea id="customMaterial" placeholder="Tempel materi di sini…" style="width:100%; min-height:110px; resize:vertical; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px; font-size:13px; font-family:inherit;"></textarea>
-        <button class="btn primary" id="customResumeBtn" style="width:100%; justify-content:center; margin-top:8px;">📝 Buat Resume</button>
-        <div class="ai-box" id="customResumeOut" style="margin-top:10px; display:none;"><b>Hasil Resume</b><span id="customResumeText"></span></div>
-      </div>
       <div class="rail-card">
         <h3>📌 Koleksi Kamu <span id="savedCount" style="color:var(--muted); font-size:12px; font-weight:500;"></span></h3>
         <div id="savedList"><div class="rail-empty">Belum ada yang disimpan. Klik "Simpan" di hasil pencarian.</div></div>
@@ -395,9 +366,6 @@
     sort: "relevance",
     yearFrom: null,
     yearTo: null,
-    resumeLen: 2,
-    resumeFormat: "paragraf",
-    resumeFocus: "",
     sintaFilter: "",
     results: [],
     seenKeys: {},
@@ -1022,7 +990,6 @@
           (item.abstractText ? '<p class="abstract">' + esc(item.abstractText) + '</p><button class="link-more" data-more>Baca semua abstrak</button>' : '<p class="abstract" style="font-style:italic;">Abstrak tidak tersedia dari sumber ini.</p>') +
           (kws.length ? '<div class="kw-row">' + kws.map(function(k){ return '<span class="kw">#' + esc(k) + '</span>'; }).join("") + '</div>' : '') +
           (isLikelyEnglish(item.title) || isLikelyEnglish(item.abstractText) ? '<div class="trans-box" data-transbox><b>🌐 Terjemahan Otomatis (Bahasa Indonesia)</b><span data-trans-text>Menerjemahkan…</span></div>' : '') +
-          '<div class="ai-box" data-ai><b>📝 Resume Materi (otomatis dari abstrak)</b><span data-ai-text>' + extractiveSummary(item.abstractText, { count: state.resumeLen, format: state.resumeFormat, focusWords: (state.resumeFocus||"").split(",") }) + '</span></div>' +
           (item.pdfUrl ? '<div class="page-box" data-pagebox><b>🔎 Lokasi Kata Kunci di Dokumen</b><span data-page-text>Memindai dokumen…</span></div>' : '') +
           '<div class="card-actions">' +
             (item.pdfUrl ? '<a class="btn primary" href="' + esc(item.pdfUrl) + '" target="_blank" rel="noopener">⬇️ Unduh (PDF/Word)</a>' : '<button class="btn" disabled>⬇️ Contoh, tanpa file asli</button>') +
@@ -1170,34 +1137,12 @@
   $("sortSelect").addEventListener("change", function(){
     state.sort = this.value; sortResults(); renderCards(state.results);
   });
-  $("resumeLen").addEventListener("change", function(){ state.resumeLen = parseInt(this.value,10); renderCards(state.results); reRenderCustomResumeIfOpen(); });
-  $("resumeFormat").addEventListener("change", function(){ state.resumeFormat = this.value; renderCards(state.results); reRenderCustomResumeIfOpen(); });
-  $("resumeFocus").addEventListener("input", debounce(function(){ state.resumeFocus = this.value; renderCards(state.results); reRenderCustomResumeIfOpen(); }, 500));
   $("sintaFilter").addEventListener("change", function(){ state.sintaFilter = this.value; if(state.query.trim()) runSearch(false); });
   $("yearFrom").addEventListener("change", function(){ state.yearFrom = this.value ? parseInt(this.value,10) : null; if(state.query.trim()) runSearch(false); });
   $("yearTo").addEventListener("change", function(){ state.yearTo = this.value ? parseInt(this.value,10) : null; if(state.query.trim()) runSearch(false); });
 
   $("loadMoreBtn").addEventListener("click", function(){ runSearch(true); });
 
-  $("customResumeBtn").addEventListener("click", function(){
-    var text = $("customMaterial").value.trim();
-    var out = $("customResumeOut"), outText = $("customResumeText");
-    if(!text){ toast("Tempel materinya dulu, cuy ✍️"); return; }
-    var opts = { count: state.resumeLen, format: state.resumeFormat, focusWords: (state.resumeFocus||"").split(",") };
-    outText.innerHTML = extractiveSummary(text, opts);
-    out.style.display = "block";
-  });
-  // kalau pengaturan resume berubah dan hasil custom lagi kebuka, ikut update otomatis
-  function reRenderCustomResumeIfOpen(){
-    var out = $("customResumeOut");
-    if(out.style.display === "block"){
-      var text = $("customMaterial").value.trim();
-      if(text){
-        var opts = { count: state.resumeLen, format: state.resumeFormat, focusWords: (state.resumeFocus||"").split(",") };
-        $("customResumeText").innerHTML = extractiveSummary(text, opts);
-      }
-    }
-  }
   $("exportBibtexBtn").addEventListener("click", exportBibtex);
   $("clearSavedBtn").addEventListener("click", function(){ setSaved([]); renderSaved(); renderCards(state.results); toast("Koleksi dikosongkan"); });
 
