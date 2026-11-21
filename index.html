@@ -192,6 +192,14 @@
   .page-box b{ font-family: var(--font-display); font-size:12px; color: var(--accent4); display:block; margin-bottom:4px; letter-spacing:.02em;}
   .page-chip{ display:inline-block; background: rgba(62,232,255,0.18); color:#cdf4ff; border-radius:999px; padding:3px 10px; font-size:12.5px; font-weight:700; margin:3px 4px 0 0; }
 
+  .trans-box{
+    margin: 2px 0 14px; padding: 12px 14px; border-radius:14px;
+    background: rgba(198,255,62,0.07); border: 1px solid rgba(198,255,62,0.3);
+    font-size: 13.5px; color:#eaffc9;
+  }
+  .trans-box b{ font-family: var(--font-display); font-size:12px; color: var(--accent3); display:block; margin-bottom:4px; letter-spacing:.02em;}
+  .trans-box .tt{ font-weight:700; display:block; margin-bottom:4px; color:#fff; }
+
   .card-actions{ display:flex; gap:8px; flex-wrap:wrap; }
   .btn{
     border:1px solid var(--border); background: var(--surface-2); color: var(--text);
@@ -256,14 +264,12 @@
 <body>
 <div class="wrap">
 
-  <div style="text-align:center; color:var(--muted); font-size:12.5px; font-weight:600; margin-bottom:14px; letter-spacing:.02em;">Created by <span style="color:var(--text)">Afi Hafidzi</span></div>
-
   <header class="hero">
     <div class="brand-row">
       <div class="brand">
         <div class="logo">AI</div>
         <div>
-          <h1>Cuy AI 🔥</h1>
+          <h1>Cuy AI 🔥 <span style="font-family:var(--font-body); font-weight:600; font-size:12.5px; color:var(--muted); vertical-align:middle; letter-spacing:normal;">Created by <span style="color:var(--text)">Afi Hafidzi</span></span></h1>
           <div class="tag">Mesin cari referensi karya ilmiah — jurnal, preprint, sampai buku PDF.</div>
         </div>
       </div>
@@ -294,6 +300,25 @@
       <label>sampai <input type="number" id="yearTo" placeholder="2026" style="width:70px" /></label>
       <span class="mode-pill" style="border-color:rgba(198,255,62,0.4); color:var(--accent3);">⬇️ Hanya yang ada link unduh (PDF/Word)</span>
     </div>
+
+    <div class="adv-row" style="border-top:1px dashed var(--border); padding-top:12px; margin-top:4px;">
+      <label>📝 Resume materi:
+        <select id="resumeLen">
+          <option value="1">Super singkat (1 kalimat)</option>
+          <option value="2" selected>Sedang (2-3 kalimat)</option>
+          <option value="4">Lengkap (4-5 kalimat)</option>
+        </select>
+      </label>
+      <label>Format:
+        <select id="resumeFormat">
+          <option value="paragraf" selected>Paragraf</option>
+          <option value="poin">Poin-poin</option>
+        </select>
+      </label>
+      <label style="flex:1; min-width:220px;">Perintah/fokus resume (opsional):
+        <input type="text" id="resumeFocus" placeholder="misal: metode, hasil, kesimpulan" style="width:100%; margin-top:4px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:7px 10px; font-size:13px;" />
+      </label>
+    </div>
   </header>
 
   <div class="layout">
@@ -311,6 +336,13 @@
     </main>
 
     <aside class="rail">
+      <div class="rail-card">
+        <h3>📝 Resume Materi Sendiri</h3>
+        <p style="font-size:12.5px; color:var(--muted); margin:0 0 10px;">Tempel teks/materi apa pun (nggak harus dari hasil pencarian), biar Cuy AI bikinin resume-nya pakai pengaturan panjang/format/fokus di atas.</p>
+        <textarea id="customMaterial" placeholder="Tempel materi di sini…" style="width:100%; min-height:110px; resize:vertical; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px; font-size:13px; font-family:inherit;"></textarea>
+        <button class="btn primary" id="customResumeBtn" style="width:100%; justify-content:center; margin-top:8px;">📝 Buat Resume</button>
+        <div class="ai-box" id="customResumeOut" style="margin-top:10px; display:none;"><b>Hasil Resume</b><span id="customResumeText"></span></div>
+      </div>
       <div class="rail-card">
         <h3>📌 Koleksi Kamu <span id="savedCount" style="color:var(--muted); font-size:12px; font-weight:500;"></span></h3>
         <div id="savedList"><div class="rail-empty">Belum ada yang disimpan. Klik "Simpan" di hasil pencarian.</div></div>
@@ -344,6 +376,9 @@
     sort: "relevance",
     yearFrom: null,
     yearTo: null,
+    resumeLen: 2,
+    resumeFormat: "paragraf",
+    resumeFocus: "",
     results: [],
     seenKeys: {},
     page: { semanticscholar: 0, crossref: 0, arxiv: 0, archive: 0 },
@@ -352,7 +387,10 @@
     loading: false
   };
 
-  var STOPWORDS = ("yang dan di ke dari pada untuk dengan ini itu atau adalah akan karena oleh sebagai dalam " +
+  var TRANS_CACHE = {};
+  var PAGE_CACHE = {};
+
+  var STOPWORDS =("yang dan di ke dari pada untuk dengan ini itu atau adalah akan karena oleh sebagai dalam " +
     "para juga tidak bisa dapat telah sudah lebih kita kami mereka sangat suatu secara the and of to in a is for " +
     "on with as by an at from this that are be or was were has have had not it its into about between after " +
     "before during can may using use based study research paper article analysis effect effects").split(" ");
@@ -380,23 +418,91 @@
     return arr.slice(0, n||6).map(function(a){ return a[0]; });
   }
 
-  function extractiveSummary(text){
+  function extractiveSummary(text, opts){
+    opts = opts || {};
+    var count = opts.count || 2;
+    var format = opts.format || "paragraf";
+    var focusWords = (opts.focusWords || []).map(function(w){ return w.toLowerCase().trim(); }).filter(Boolean);
     if(!text) return "Nggak ada abstrak yang bisa diringkas buat paper ini.";
-    var sentences = text.replace(/\s+/g," ").split(/(?<=[.!?])\s+/).filter(function(s){ return s.length > 25; });
-    if(sentences.length <= 2) return text.length > 320 ? text.slice(0,317)+"…" : text;
+    var sentences = text.replace(/\s+/g," ").split(/(?<=[.!?])\s+/).filter(function(s){ return s.length > 20; });
+    if(!sentences.length) sentences = [text];
     var kw = extractKeywords(text, 10);
     var scored = sentences.map(function(s, idx){
       var score = 0; var low = s.toLowerCase();
       kw.forEach(function(k){ if(low.indexOf(k) !== -1) score++; });
       if(idx === 0) score += 1.5; // lead sentence bonus
+      focusWords.forEach(function(f){ if(low.indexOf(f) !== -1) score += 5; }); // perintah/fokus dari user, prioritas tinggi
       return { s: s, score: score, idx: idx };
     });
     scored.sort(function(a,b){ return b.score - a.score; });
-    var pick = scored.slice(0, 2).sort(function(a,b){ return a.idx - b.idx; });
-    return pick.map(function(p){ return p.s; }).join(" ");
+    var n = Math.min(count, sentences.length);
+    var pick = scored.slice(0, n).sort(function(a,b){ return a.idx - b.idx; });
+    var picked = pick.map(function(p){ return esc(p.s); });
+    if(format === "poin"){
+      return '<ul style="margin:0; padding-left:18px;">' + picked.map(function(s){ return "<li>" + s + "</li>"; }).join("") + "</ul>";
+    }
+    return picked.join(" ");
   }
 
   function debounce(fn, ms){ var t; return function(){ clearTimeout(t); var a=arguments; t=setTimeout(function(){ fn.apply(null,a); }, ms); }; }
+
+  /* ===================== Deteksi bahasa Inggris & terjemahan otomatis ===================== */
+  var EN_WORDS = ["the","and","of","in","is","for","with","as","that","this","are","was","were","on","by","an","at","we","our","study","research","paper","analysis","results","using","based","this","from","have","has","been","which","their","these","between","effect","effects"];
+  var ID_WORDS = ["yang","dan","dengan","ini","itu","untuk","pada","dari","adalah","akan","telah","juga","kami","kita","penelitian","hasil","dalam","oleh","atau","dapat","secara","terhadap","tersebut"];
+  function wordScore(lowerText, words){
+    var s = 0;
+    words.forEach(function(w){
+      var re = new RegExp("\\b" + w + "\\b", "g");
+      var m = lowerText.match(re);
+      if(m) s += m.length;
+    });
+    return s;
+  }
+  function isLikelyEnglish(text){
+    if(!text || text.length < 8) return false;
+    var lower = text.toLowerCase();
+    var enScore = wordScore(lower, EN_WORDS);
+    var idScore = wordScore(lower, ID_WORDS);
+    return enScore >= 2 && enScore > idScore;
+  }
+
+  function chunkText(text, maxLen){
+    var sentences = text.replace(/\s+/g," ").split(/(?<=[.!?])\s+/);
+    var chunks = []; var cur = "";
+    sentences.forEach(function(s){
+      if((cur + " " + s).trim().length > maxLen && cur){ chunks.push(cur.trim()); cur = s; }
+      else { cur = (cur ? cur + " " : "") + s; }
+    });
+    if(cur.trim()) chunks.push(cur.trim());
+    // kalau ada kalimat tunggal yang masih kepanjangan, potong paksa
+    var safe = [];
+    chunks.forEach(function(c){
+      while(c.length > maxLen){ safe.push(c.slice(0, maxLen)); c = c.slice(maxLen); }
+      if(c) safe.push(c);
+    });
+    return safe;
+  }
+
+  function mymemoryTranslate(chunk){
+    var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(chunk) + "&langpair=en|id";
+    return fetch(url).then(function(r){ if(!r.ok) throw new Error("mm-"+r.status); return r.json(); }).then(function(data){
+      if(data && data.responseData && data.responseData.translatedText){
+        return data.responseData.translatedText;
+      }
+      throw new Error("mm-empty");
+    });
+  }
+
+  function translateToIndonesian(text){
+    if(!text) return Promise.resolve("");
+    var chunks = chunkText(text, 450);
+    var out = [];
+    var chain = Promise.resolve();
+    chunks.forEach(function(c){
+      chain = chain.then(function(){ return mymemoryTranslate(c); }).then(function(t){ out.push(t); });
+    });
+    return chain.then(function(){ return out.join(" "); });
+  }
 
   /* ===================== Cari kata kunci per halaman (PDF only) ===================== */
   if(window.pdfjsLib){
@@ -618,27 +724,51 @@
     });
   }
 
+  function pickArchivePdfFile(files, identifier){
+    if(!files || !files.length) return null;
+    // prioritas: file bertipe "Text PDF" / "Additional Text PDF", bukan thumbnail/cover
+    var byFormat = files.find(function(f){
+      return f.format && /text pdf/i.test(f.format) && f.name && /\.pdf$/i.test(f.name);
+    });
+    if(byFormat) return byFormat.name;
+    // fallback: file .pdf apa pun yang bukan kecil banget (hindari cover.pdf dsb kalau ada yang lebih lengkap)
+    var anyPdf = files.filter(function(f){ return f.name && /\.pdf$/i.test(f.name); });
+    if(anyPdf.length){
+      anyPdf.sort(function(a,b){ return (parseInt(b.size||0,10)) - (parseInt(a.size||0,10)); });
+      return anyPdf[0].name;
+    }
+    return null;
+  }
+
   function fetchArchiveBooks(query, offset, limit){
-    var url = "https://archive.org/advancedsearch.php?q=" + encodeURIComponent(query + " AND mediatype:texts") +
-      "&fl[]=identifier&fl[]=title&fl[]=creator&fl[]=year&fl[]=publisher" +
+    var url = "https://archive.org/advancedsearch.php?q=" + encodeURIComponent(query) +
+      "&fl[]=identifier&fl[]=title&fl[]=creator&fl[]=year&fl[]=publisher&fl[]=description" +
       "&rows=" + limit + "&page=" + (Math.floor(offset/limit)+1) + "&output=json";
     return fetch(url).then(function(r){ if(!r.ok) throw new Error("ia-"+r.status); return r.json(); }).then(function(data){
       var docs = (data.response && data.response.docs) || [];
-      return docs.map(function(d){
-        var creator = d.creator ? (Array.isArray(d.creator) ? d.creator : [d.creator]) : [];
-        return {
-          id: "ia-" + d.identifier,
-          title: d.title || "(Tanpa judul)",
-          authors: creator,
-          year: d.year ? parseInt(d.year,10) : null,
-          venue: d.publisher || "Internet Archive",
-          type: "book",
-          citationCount: 0,
-          abstractText: "",
-          pdfUrl: null,
-          pageUrl: "https://archive.org/details/" + d.identifier
-        };
-      });
+      // cek metadata tiap item buat nemu nama file PDF asli (link download Archive.org nggak bisa ditebak dari identifier doang)
+      return Promise.all(docs.map(function(d){
+        return fetch("https://archive.org/metadata/" + encodeURIComponent(d.identifier))
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .catch(function(){ return null; })
+          .then(function(meta){
+            var pdfName = meta && meta.files ? pickArchivePdfFile(meta.files, d.identifier) : null;
+            var creator = d.creator ? (Array.isArray(d.creator) ? d.creator : [d.creator]) : [];
+            var desc = Array.isArray(d.description) ? d.description.join(" ") : (d.description || "");
+            return {
+              id: "ia-" + d.identifier,
+              title: d.title || "(Tanpa judul)",
+              authors: creator,
+              year: d.year ? parseInt(d.year,10) : null,
+              venue: d.publisher || "Internet Archive",
+              type: "book",
+              citationCount: 0,
+              abstractText: desc.replace(/<[^>]+>/g," ").trim(),
+              pdfUrl: pdfName ? ("https://archive.org/download/" + d.identifier + "/" + encodeURIComponent(pdfName)) : null,
+              pageUrl: "https://archive.org/details/" + d.identifier
+            };
+          });
+      }));
     });
   }
 
@@ -810,12 +940,11 @@
           '<div class="card-meta">' + metaBits.map(esc).join(" · ") + '</div>' +
           (item.abstractText ? '<p class="abstract">' + esc(item.abstractText) + '</p><button class="link-more" data-more>Baca semua abstrak</button>' : '<p class="abstract" style="font-style:italic;">Abstrak tidak tersedia dari sumber ini.</p>') +
           (kws.length ? '<div class="kw-row">' + kws.map(function(k){ return '<span class="kw">#' + esc(k) + '</span>'; }).join("") + '</div>' : '') +
-          '<div class="ai-box" data-ai hidden><b>🧠 Ringkasan Cerdas (otomatis dari abstrak)</b><span data-ai-text></span></div>' +
-          '<div class="page-box" data-pagebox hidden><b>🔎 Lokasi Kata Kunci</b><span data-page-text>Memindai dokumen…</span></div>' +
+          (isLikelyEnglish(item.title) || isLikelyEnglish(item.abstractText) ? '<div class="trans-box" data-transbox><b>🌐 Terjemahan Otomatis (Bahasa Indonesia)</b><span data-trans-text>Menerjemahkan…</span></div>' : '') +
+          '<div class="ai-box" data-ai><b>📝 Resume Materi (otomatis dari abstrak)</b><span data-ai-text>' + extractiveSummary(item.abstractText, { count: state.resumeLen, format: state.resumeFormat, focusWords: (state.resumeFocus||"").split(",") }) + '</span></div>' +
+          (item.pdfUrl ? '<div class="page-box" data-pagebox><b>🔎 Lokasi Kata Kunci di Dokumen</b><span data-page-text>Memindai dokumen…</span></div>' : '') +
           '<div class="card-actions">' +
             (item.pdfUrl ? '<a class="btn primary" href="' + esc(item.pdfUrl) + '" target="_blank" rel="noopener">⬇️ Unduh (PDF/Word)</a>' : '<button class="btn" disabled>⬇️ Contoh, tanpa file asli</button>') +
-            (item.pdfUrl ? '<button class="btn" data-page-toggle>🔎 Cari di Halaman</button>' : '') +
-            '<button class="btn" data-ai-toggle>🧠 Ringkasan Cerdas</button>' +
             '<button class="btn ' + (saved ? "saved" : "") + '" data-save>' + (saved ? "⭐ Tersimpan" : "☆ Simpan") + '</button>' +
             '<button class="btn ghost" data-cite-toggle>📎 Sitasi</button>' +
           '</div>' +
@@ -844,44 +973,60 @@
         });
       }
 
-      cardEl.querySelector("[data-ai-toggle]").addEventListener("click", function(){
-        var box = cardEl.querySelector("[data-ai]");
-        if(box.hasAttribute("hidden")){
-          box.querySelector("[data-ai-text]").textContent = " " + extractiveSummary(item.abstractText);
-          box.removeAttribute("hidden");
-        } else { box.setAttribute("hidden",""); }
-      });
-
       cardEl.querySelector("[data-save]").addEventListener("click", function(){ toggleSave(item); });
 
-      var pageToggle = cardEl.querySelector("[data-page-toggle]");
-      if(pageToggle){
-        var pageDone = false;
-        pageToggle.addEventListener("click", function(){
-          var box = cardEl.querySelector("[data-pagebox]");
-          var textEl = box.querySelector("[data-page-text]");
-          if(!box.hasAttribute("hidden") && pageDone){ box.setAttribute("hidden",""); return; }
-          box.removeAttribute("hidden");
-          if(pageDone) return;
-          if(!looksLikePdf(item.pdfUrl)){
-            textEl.innerHTML = " Link ini kemungkinan file Word, bukan PDF. Format Word nggak menyimpan nomor halaman di dalam filenya sendiri, jadi Cuy AI belum bisa kasih tahu halaman pastinya — buka file-nya langsung buat nyari manual (Ctrl/Cmd+F).";
-            pageDone = true; return;
-          }
-          textEl.textContent = " Memindai dokumen, bentar ya…";
+      // Terjemahkan otomatis judul & abstrak kalau terdeteksi berbahasa Inggris (di-cache biar nggak fetch ulang)
+      var transBox = cardEl.querySelector("[data-transbox]");
+      if(transBox){
+        var transText = transBox.querySelector("[data-trans-text]");
+        if(TRANS_CACHE[item.id]){
+          transText.innerHTML = TRANS_CACHE[item.id];
+        } else {
+          var needTitle = isLikelyEnglish(item.title);
+          var needAbs = isLikelyEnglish(item.abstractText);
+          Promise.all([
+            needTitle ? translateToIndonesian(item.title) : Promise.resolve(null),
+            needAbs ? translateToIndonesian(item.abstractText) : Promise.resolve(null)
+          ]).then(function(res){
+            var titleId = res[0], absId = res[1];
+            var html = "";
+            if(titleId) html += '<span class="tt">' + esc(titleId) + '</span>';
+            if(absId) html += esc(absId);
+            if(!html) html = "Nggak ada teks berbahasa Inggris yang perlu diterjemahkan.";
+            html += ' <span style="color:var(--muted); font-size:11.5px;">(terjemahan mesin, bisa kurang pas secara konteks)</span>';
+            TRANS_CACHE[item.id] = html;
+            transText.innerHTML = html;
+          }).catch(function(){
+            transText.textContent = "Gagal menerjemahkan otomatis (layanan terjemahan lagi nggak bisa diakses). Coba translate manual via Google Translate.";
+          });
+        }
+      }
+
+      // Pindai otomatis halaman yang cocok dengan kata kunci pencarian, langsung saat hasil muncul (di-cache).
+      var pageBox = cardEl.querySelector("[data-pagebox]");
+      if(pageBox && item.pdfUrl){
+        var textEl = pageBox.querySelector("[data-page-text]");
+        if(PAGE_CACHE[item.id]){
+          textEl.innerHTML = PAGE_CACHE[item.id];
+        } else if(!looksLikePdf(item.pdfUrl)){
+          var msg = "Link ini kemungkinan file Word, bukan PDF. Format Word nggak menyimpan nomor halaman di dalam filenya sendiri, jadi Cuy AI belum bisa kasih tahu halaman pastinya — buka file-nya langsung buat nyari manual (Ctrl/Cmd+F).";
+          PAGE_CACHE[item.id] = msg; textEl.innerHTML = msg;
+        } else {
           findPagesInPdf(item.pdfUrl, state.query).then(function(res){
-            pageDone = true;
+            var msg;
             if(!res.pageNums.length){
-              textEl.innerHTML = " Kata kunci \"" + esc(state.query) + "\" nggak ketemu di teks dokumen ini (dari " + res.scanned + " dari " + res.totalPages + " halaman yang dipindai). Bisa jadi hasil scan gambar tanpa teks, atau istilahnya beda kata.";
+              msg = "Kata kunci \"" + esc(state.query) + "\" nggak ketemu di teks dokumen ini (dari " + res.scanned + " dari " + res.totalPages + " halaman yang dipindai). Bisa jadi hasil scan gambar tanpa teks, atau istilahnya beda kata.";
             } else {
-              textEl.innerHTML = " Kata kunci \"" + esc(state.query) + "\" muncul di halaman: " +
+              msg = "Kata kunci \"" + esc(state.query) + "\" muncul di halaman: " +
                 res.pageNums.map(function(n){ return '<span class="page-chip">hal. ' + n + '</span>'; }).join("") +
                 (res.scanned < res.totalPages ? ' <span style="color:var(--muted)">(baru memindai ' + res.scanned + ' dari ' + res.totalPages + ' halaman)</span>' : "");
             }
+            PAGE_CACHE[item.id] = msg;
+            textEl.innerHTML = msg;
           }).catch(function(err){
-            pageDone = true;
-            textEl.textContent = " Nggak bisa memindai file ini dari sini — kemungkinan situs sumbernya memblokir akses, atau koneksi keluar lagi diblokir (mode pratinjau). Coba buka link PDF-nya langsung dan cari manual pakai Ctrl/Cmd+F.";
+            textEl.textContent = "Nggak bisa memindai file ini dari sini — kemungkinan situs sumbernya memblokir akses, atau koneksi keluar lagi diblokir (mode pratinjau). Coba buka link PDF-nya langsung dan cari manual pakai Ctrl/Cmd+F.";
           });
-        });
+        }
       }
 
       var citeToggle = cardEl.querySelector("[data-cite-toggle]");
@@ -943,10 +1088,33 @@
   $("sortSelect").addEventListener("change", function(){
     state.sort = this.value; sortResults(); renderCards(state.results);
   });
+  $("resumeLen").addEventListener("change", function(){ state.resumeLen = parseInt(this.value,10); renderCards(state.results); reRenderCustomResumeIfOpen(); });
+  $("resumeFormat").addEventListener("change", function(){ state.resumeFormat = this.value; renderCards(state.results); reRenderCustomResumeIfOpen(); });
+  $("resumeFocus").addEventListener("input", debounce(function(){ state.resumeFocus = this.value; renderCards(state.results); reRenderCustomResumeIfOpen(); }, 500));
   $("yearFrom").addEventListener("change", function(){ state.yearFrom = this.value ? parseInt(this.value,10) : null; if(state.query.trim()) runSearch(false); });
   $("yearTo").addEventListener("change", function(){ state.yearTo = this.value ? parseInt(this.value,10) : null; if(state.query.trim()) runSearch(false); });
 
   $("loadMoreBtn").addEventListener("click", function(){ runSearch(true); });
+
+  $("customResumeBtn").addEventListener("click", function(){
+    var text = $("customMaterial").value.trim();
+    var out = $("customResumeOut"), outText = $("customResumeText");
+    if(!text){ toast("Tempel materinya dulu, cuy ✍️"); return; }
+    var opts = { count: state.resumeLen, format: state.resumeFormat, focusWords: (state.resumeFocus||"").split(",") };
+    outText.innerHTML = extractiveSummary(text, opts);
+    out.style.display = "block";
+  });
+  // kalau pengaturan resume berubah dan hasil custom lagi kebuka, ikut update otomatis
+  function reRenderCustomResumeIfOpen(){
+    var out = $("customResumeOut");
+    if(out.style.display === "block"){
+      var text = $("customMaterial").value.trim();
+      if(text){
+        var opts = { count: state.resumeLen, format: state.resumeFormat, focusWords: (state.resumeFocus||"").split(",") };
+        $("customResumeText").innerHTML = extractiveSummary(text, opts);
+      }
+    }
+  }
   $("exportBibtexBtn").addEventListener("click", exportBibtex);
   $("clearSavedBtn").addEventListener("click", function(){ setSaved([]); renderSaved(); renderCards(state.results); toast("Koleksi dikosongkan"); });
 
