@@ -181,8 +181,13 @@
     margin: 2px 0 14px; padding: 12px 14px; border-radius:14px;
     background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(236,72,153,0.08));
     border: 1px solid rgba(139,92,246,0.3); font-size: 13.5px; color:#e7e3f7;
+    max-height: 260px; overflow-y: auto;
   }
   .ai-box b{ font-family: var(--font-display); font-size:12px; color: var(--accent3); display:block; margin-bottom:4px; letter-spacing:.02em;}
+  .ai-box::-webkit-scrollbar{ width: 8px; }
+  .ai-box::-webkit-scrollbar-track{ background: transparent; }
+  .ai-box::-webkit-scrollbar-thumb{ background: var(--accent1); border-radius: 999px; }
+  .ai-box{ scrollbar-width: thin; scrollbar-color: var(--accent1) transparent; }
 
   .page-box{
     margin: 2px 0 14px; padding: 12px 14px; border-radius:14px;
@@ -319,6 +324,20 @@
         <input type="text" id="resumeFocus" placeholder="misal: metode, hasil, kesimpulan" style="width:100%; margin-top:4px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:7px 10px; font-size:13px;" />
       </label>
     </div>
+
+    <div class="adv-row" style="border-top:1px dashed var(--border); padding-top:12px;">
+      <label>🏷️ Filter SINTA:
+        <select id="sintaFilter">
+          <option value="">Semua (nggak difilter)</option>
+          <option value="1">SINTA 1</option>
+          <option value="2">SINTA 2</option>
+          <option value="3">SINTA 3</option>
+          <option value="4">SINTA 4</option>
+          <option value="5">SINTA 5</option>
+        </select>
+      </label>
+      <span style="color:var(--muted); font-size:12px; max-width:560px;">⚠️ Data SINTA di sini cuma daftar terkurasi manual dari sumber publik (mayoritas rumpun Komunikasi), <b style="color:var(--text)">bukan database lengkap 10 ribuan jurnal SINTA</b>. Selalu cek ulang di <a href="https://sinta.kemdikbud.go.id" target="_blank" rel="noopener">sinta.kemdikbud.go.id</a>. Scopus belum punya API gratis, jadi tiap hasil dikasih tombol "Cek Scopus" buat verifikasi manual.</span>
+    </div>
   </header>
 
   <div class="layout">
@@ -379,6 +398,7 @@
     resumeLen: 2,
     resumeFormat: "paragraf",
     resumeFocus: "",
+    sintaFilter: "",
     results: [],
     seenKeys: {},
     page: { semanticscholar: 0, crossref: 0, arxiv: 0, archive: 0 },
@@ -389,6 +409,62 @@
 
   var TRANS_CACHE = {};
   var PAGE_CACHE = {};
+
+  /* Daftar jurnal SINTA terkurasi manual dari sumber publik (TERBATAS, mayoritas rumpun Komunikasi).
+     Bukan daftar lengkap 10 ribuan jurnal SINTA — cuma buat contoh pencocokan yang akurat untuk judul2 di bawah ini.
+     Selalu verifikasi ulang di sinta.kemdikbud.go.id sebelum dipakai resmi. */
+  var CURATED_SINTA_JOURNALS = [
+    {t:"harmonia: journal of arts research and education", tier:1},
+    {t:"jurnal ilmu sosial dan ilmu politik", tier:1},
+    {t:"wacana, journal of the humanities of indonesia", tier:1},
+    {t:"wacana", tier:1},
+    {t:"al-balagh", tier:2},
+    {t:"andharupa", tier:2},
+    {t:"jurnal aspikom", tier:2},
+    {t:"jurnal ilmu komunikasi upn veteran yogyakarta", tier:2},
+    {t:"jurnal informasi", tier:2},
+    {t:"jurnal iski", tier:2},
+    {t:"jurnal kajian komunikasi", tier:2},
+    {t:"jurnal komunikasi indonesia", tier:2},
+    {t:"jurnal komunikasi penyiaran islam", tier:2},
+    {t:"communicatus", tier:3},
+    {t:"digital zone", tier:3},
+    {t:"ettisal", tier:3},
+    {t:"interaksi: jurnal ilmu komunikasi", tier:3},
+    {t:"islamic communication journal", tier:3},
+    {t:"jurnal iptek-kom", tier:3},
+    {t:"jurnal kmp", tier:3},
+    {t:"jurnal komunikasi fikom untar", tier:3},
+    {t:"jurnal komunikator", tier:3},
+    {t:"jurnal manajemen komunikasi", tier:3},
+    {t:"wikrama parahita", tier:3},
+    {t:"aksiologiya", tier:3},
+    {t:"jurnal spektrum komunikasi", tier:4},
+    {t:"avant garde", tier:4},
+    {t:"channel: jurnal komunikasi", tier:4},
+    {t:"commed", tier:4},
+    {t:"common: jurnal prodi ilmu komunikasi", tier:4},
+    {t:"communicare", tier:4},
+    {t:"communicology", tier:4},
+    {t:"inject", tier:4},
+    {t:"jipsi", tier:4},
+    {t:"jurnal inovasi hasil pengabdian masyarakat", tier:4},
+    {t:"j-dinamika", tier:4},
+    {t:"al-mishbah", tier:5},
+    {t:"darussalam", tier:5},
+    {t:"j-ika", tier:5},
+    {t:"jike: jurnal ilmu komunikasi efek", tier:5},
+    {t:"jurnal ilmu komunikasi dan bisnis", tier:5},
+    {t:"jurnal kajian media", tier:5},
+    {t:"jurnal kinesik", tier:5},
+    {t:"jurnal komunikasi (univ. trunojoyo", tier:5}
+  ];
+  function getSintaTier(text){
+    if(!text) return null;
+    var low = text.toLowerCase();
+    var hit = CURATED_SINTA_JOURNALS.find(function(j){ return low.indexOf(j.t) !== -1; });
+    return hit ? hit.tier : null;
+  }
 
   var STOPWORDS =("yang dan di ke dari pada untuk dengan ini itu atau adalah akan karena oleh sebagai dalam " +
     "para juga tidak bisa dapat telah sudah lebih kita kami mereka sangat suatu secara the and of to in a is for " +
@@ -832,6 +908,10 @@
         if(state.yearFrom && item.year && item.year < state.yearFrom) return;
         if(state.yearTo && item.year && item.year > state.yearTo) return;
         if(!item.pdfUrl && !item.isDemo) return; // cuma tampilkan hasil yang punya link unduh (PDF/Word)
+        if(state.sintaFilter){
+          var tier = getSintaTier(item.venue) || getSintaTier(item.title);
+          if(tier !== parseInt(state.sintaFilter,10)) return; // filter SINTA pakai daftar kurasi manual (cakupan terbatas)
+        }
         state.seenKeys[key] = true;
         state.results.push(item);
       });
@@ -933,9 +1013,10 @@
       if(item.citationCount) metaBits.push(item.citationCount + " sitasi");
       var kws = extractKeywords(item.abstractText, 6);
       var saved = isSaved(item.id);
+      var sintaTier = getSintaTier(item.venue) || getSintaTier(item.title);
       return '' +
         '<div class="card" data-idx="' + i + '">' +
-          '<div class="card-top">' + typeBadge(item.type) + (item.isDemo ? '<span class="badge demo">Contoh/Demo</span>' : '') + '</div>' +
+          '<div class="card-top">' + typeBadge(item.type) + (item.isDemo ? '<span class="badge demo">Contoh/Demo</span>' : '') + (sintaTier ? '<span class="badge journal" style="background:rgba(198,255,62,0.18); color:#dcff92;">SINTA ' + sintaTier + '</span>' : '') + '</div>' +
           '<h3 class="card-title">' + (item.pageUrl ? '<a href="' + esc(item.pageUrl) + '" target="_blank" rel="noopener">' + esc(item.title) + '</a>' : esc(item.title)) + '</h3>' +
           '<div class="card-meta">' + metaBits.map(esc).join(" · ") + '</div>' +
           (item.abstractText ? '<p class="abstract">' + esc(item.abstractText) + '</p><button class="link-more" data-more>Baca semua abstrak</button>' : '<p class="abstract" style="font-style:italic;">Abstrak tidak tersedia dari sumber ini.</p>') +
@@ -947,6 +1028,7 @@
             (item.pdfUrl ? '<a class="btn primary" href="' + esc(item.pdfUrl) + '" target="_blank" rel="noopener">⬇️ Unduh (PDF/Word)</a>' : '<button class="btn" disabled>⬇️ Contoh, tanpa file asli</button>') +
             '<button class="btn ' + (saved ? "saved" : "") + '" data-save>' + (saved ? "⭐ Tersimpan" : "☆ Simpan") + '</button>' +
             '<button class="btn ghost" data-cite-toggle>📎 Sitasi</button>' +
+            (item.venue ? '<a class="btn ghost" href="https://www.google.com/search?q=' + encodeURIComponent('"' + item.venue + '" scopus indexed site:scopus.com OR site:scimagojr.com') + '" target="_blank" rel="noopener" title="Buka pencarian manual buat verifikasi status Scopus jurnal ini">🔍 Cek Scopus</a>' : '') +
           '</div>' +
           '<div class="cite-panel" data-cite-panel hidden>' +
             '<div class="cite-tabs">' +
@@ -1091,6 +1173,7 @@
   $("resumeLen").addEventListener("change", function(){ state.resumeLen = parseInt(this.value,10); renderCards(state.results); reRenderCustomResumeIfOpen(); });
   $("resumeFormat").addEventListener("change", function(){ state.resumeFormat = this.value; renderCards(state.results); reRenderCustomResumeIfOpen(); });
   $("resumeFocus").addEventListener("input", debounce(function(){ state.resumeFocus = this.value; renderCards(state.results); reRenderCustomResumeIfOpen(); }, 500));
+  $("sintaFilter").addEventListener("change", function(){ state.sintaFilter = this.value; if(state.query.trim()) runSearch(false); });
   $("yearFrom").addEventListener("change", function(){ state.yearFrom = this.value ? parseInt(this.value,10) : null; if(state.query.trim()) runSearch(false); });
   $("yearTo").addEventListener("change", function(){ state.yearTo = this.value ? parseInt(this.value,10) : null; if(state.query.trim()) runSearch(false); });
 
